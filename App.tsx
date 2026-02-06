@@ -1,4 +1,4 @@
-import React, { useState, Suspense } from 'react';
+import React, { useState, Suspense, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ScrollControls, useScroll } from '@react-three/drei';
 import * as THREE from 'three';
@@ -9,12 +9,12 @@ import { EditModal } from './components/EditModal';
 import { Project } from './types';
 import { UIProvider } from './context/UIContext';
 
-// Initial Data
+// Categories: media, UX UI, architecture, technology
 const INITIAL_PROJECTS: Project[] = [
   {
     id: '1',
     title: 'Kinetic',
-    category: 'Product Design',
+    category: 'UX UI',
     role: 'Lead Designer',
     year: '2024',
     description: 'A Credit-based Physio Platform: Incentive Design under Adversarial Conditions.',
@@ -24,7 +24,7 @@ const INITIAL_PROJECTS: Project[] = [
   {
     id: '2',
     title: 'Think less Vibe',
-    category: 'Engineering',
+    category: 'Technology',
     role: 'Developer',
     year: '2024',
     description: 'Coding a Furniture Auditing Tool inspired by Dieter Rams: Less, But Better.',
@@ -34,7 +34,7 @@ const INITIAL_PROJECTS: Project[] = [
   {
     id: '3',
     title: 'Walley Bank',
-    category: 'UI/UX',
+    category: 'UX UI',
     role: 'Product Designer',
     year: '2023',
     description: 'Responsive UI Design for Fintech Service.',
@@ -44,12 +44,22 @@ const INITIAL_PROJECTS: Project[] = [
   {
     id: '4',
     title: 'Relish',
-    category: 'Web Development',
+    category: 'Media',
     role: 'Full Stack',
     year: '2022',
     description: 'Progressive Web App for Dining Recommendation.',
     position: [-2, 2, -40],
     tech: ['PWA', 'React', 'Node.js']
+  },
+  {
+    id: '5',
+    title: 'Void Structure',
+    category: 'Architecture',
+    role: 'Architect',
+    year: '2023',
+    description: 'Procedural generation of housing units showing permanences and correspondences.',
+    position: [2, -2, -50],
+    tech: ['Unreal Engine', 'Rhino', 'Grasshopper']
   }
 ];
 
@@ -58,7 +68,7 @@ const SceneController: React.FC<{ setScrollProgress: (v: number) => void }> = ({
   const scroll = useScroll();
   
   useFrame((state) => {
-    const depth = 50; 
+    const depth = 60; 
     const targetZ = -(scroll.offset * depth);
     state.camera.position.z = THREE.MathUtils.lerp(state.camera.position.z, targetZ, 0.1);
     
@@ -76,17 +86,29 @@ const App: React.FC = () => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string>('ALL');
 
   const handleProjectUpdate = (updatedProject: Project) => {
     setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
   };
 
+  // Filter logic
+  const visibleProjects = useMemo(() => {
+    if (activeCategory === 'ALL') return projects;
+    return projects.filter(p => p.category.toLowerCase() === activeCategory.toLowerCase());
+  }, [projects, activeCategory]);
+
   return (
     <UIProvider>
       <div className="relative w-full h-screen bg-white overflow-hidden">
         
-        {/* 2D HUD Layer */}
-        <HUD scrollProgress={scrollProgress} totalDepth={50} />
+        {/* 2D HUD Layer with Category Control */}
+        <HUD 
+          scrollProgress={scrollProgress} 
+          totalDepth={60} 
+          activeCategory={activeCategory}
+          setActiveCategory={setActiveCategory}
+        />
 
         {/* Edit Modal Layer */}
         {editingProject && (
@@ -102,22 +124,26 @@ const App: React.FC = () => {
         <Canvas 
           shadows 
           camera={{ position: [0, 0, 5], fov: 60 }} 
-          gl={{ antialias: true, toneMapping: THREE.NoToneMapping }} // No tone mapping for stark contrast
+          gl={{ antialias: true, toneMapping: THREE.NoToneMapping }} 
         >
           {/* Default to white background for Superstudio look */}
           <color attach="background" args={['#f5f5f5']} />
           
           <Suspense fallback={null}>
-            <ScrollControls pages={5} damping={0.2}>
+            <ScrollControls pages={6} damping={0.2}>
                <SceneController setScrollProgress={setScrollProgress} />
                <ArchitecturalGrid />
-               {projects.map(project => (
-                 <ProjectNode 
-                    key={project.id} 
-                    project={project} 
-                    onEdit={setEditingProject} 
-                 />
-               ))}
+               {projects.map(project => {
+                 const isVisible = activeCategory === 'ALL' || project.category.toLowerCase() === activeCategory.toLowerCase();
+                 return (
+                   <ProjectNode 
+                      key={project.id} 
+                      project={project} 
+                      onEdit={setEditingProject}
+                      isVisible={isVisible}
+                   />
+                 );
+               })}
             </ScrollControls>
           </Suspense>
         </Canvas>

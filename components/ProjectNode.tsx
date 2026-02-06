@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -8,9 +8,10 @@ import { useUI } from '../context/UIContext';
 interface ProjectNodeProps {
   project: Project;
   onEdit: (project: Project) => void;
+  isVisible: boolean;
 }
 
-export const ProjectNode: React.FC<ProjectNodeProps> = ({ project, onEdit }) => {
+export const ProjectNode: React.FC<ProjectNodeProps> = ({ project, onEdit, isVisible }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   const { viewMode, setCursorData } = useUI();
@@ -19,9 +20,14 @@ export const ProjectNode: React.FC<ProjectNodeProps> = ({ project, onEdit }) => 
     if (!meshRef.current) return;
     // Slow, monumental rotation
     meshRef.current.rotation.y += 0.002;
+    
+    // Scale animation based on visibility
+    const targetScale = isVisible ? 1 : 0;
+    meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
   });
 
   const handlePointerOver = (e: any) => {
+    if (!isVisible) return;
     e.stopPropagation();
     setHovered(true);
     document.body.style.cursor = 'pointer';
@@ -40,20 +46,18 @@ export const ProjectNode: React.FC<ProjectNodeProps> = ({ project, onEdit }) => 
   };
 
   const handleClick = (e: any) => {
+    if (!isVisible) return;
     e.stopPropagation();
     onEdit(project);
   };
 
   const isWireframe = viewMode === 'wireframe';
 
+  // If completely hidden, don't render children to save performance
+  if (!isVisible && meshRef.current && meshRef.current.scale.x < 0.01) return null;
+
   return (
     <group position={new THREE.Vector3(...project.position)}>
-      {/* 
-         Superstudio Aesthetic: 
-         Pure Black Silhouette (Monolith).
-         If image exists, we could texture it, but "Black Silhouette" is the request.
-         We will keep it black geometry to contrast the white grid.
-      */}
       <mesh 
         ref={meshRef}
         onPointerOver={handlePointerOver}
@@ -71,20 +75,22 @@ export const ProjectNode: React.FC<ProjectNodeProps> = ({ project, onEdit }) => 
       </mesh>
 
       {/* The Reflection/Grounding Line - Stark Black */}
-      <line>
-        <bufferGeometry>
-            <float32BufferAttribute 
-                attach="attributes-position" 
-                args={[new Float32Array([0, -2, 0, 0, -project.position[1] - 2, 0]), 3]} 
-                count={2} 
-                itemSize={3}
-            />
-        </bufferGeometry>
-        <lineBasicMaterial color="#000000" transparent opacity={0.5} />
-      </line>
+      {isVisible && (
+        <line>
+          <bufferGeometry>
+              <float32BufferAttribute 
+                  attach="attributes-position" 
+                  args={[new Float32Array([0, -2, 0, 0, -project.position[1] - 2, 0]), 3]} 
+                  count={2} 
+                  itemSize={3}
+              />
+          </bufferGeometry>
+          <lineBasicMaterial color="#000000" transparent opacity={0.5} />
+        </line>
+      )}
 
       {/* Hover Annotation (In-Scene) */}
-      {(hovered && !isWireframe) && (
+      {(hovered && isVisible && !isWireframe) && (
         <Html 
             transform 
             occlude 

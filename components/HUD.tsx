@@ -7,14 +7,21 @@ import { useUI } from '../context/UIContext';
 interface HUDProps {
   scrollProgress: number;
   totalDepth: number;
+  activeCategory?: string;
+  setActiveCategory?: (category: string) => void;
 }
 
-export const HUD: React.FC<HUDProps> = ({ scrollProgress, totalDepth }) => {
+const CATEGORIES = ['ALL', 'MEDIA', 'UX UI', 'ARCHITECTURE', 'TECHNOLOGY'];
+
+const MANIFESTO = "The site is organised into several main categories (media, UX UI, architecture, technology). Looking at architecture from outside the boundaries of the discipline, explores different areas of investigation and reveals their underlying affinities and relationships through an approach ranging from pure curatorial practice to in-depth analysis. Its articles follow a non-linear sequence, aiming to show permanences, correspondences and anachronisms among works situated far away in time and space and, in this way, offer alternative tools for contemporary architectural research and design.";
+
+export const HUD: React.FC<HUDProps> = ({ scrollProgress, totalDepth, activeCategory = 'ALL', setActiveCategory }) => {
   const [mousePos, setMousePos] = useState<MousePosition>({ x: 0, y: 0 });
   const [chatOpen, setChatOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'model', text: 'ARCHIVE ACCESSED.', timestamp: Date.now() }
+    { role: 'model', text: 'ARCHIVE ACCESSED. TYPE "install skill.sh" FOR TECH STACK.', timestamp: Date.now() }
   ]);
   const [loading, setLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -42,6 +49,20 @@ export const HUD: React.FC<HUDProps> = ({ scrollProgress, totalDepth }) => {
     setQuery('');
     setLoading(true);
 
+    // Easter Egg: install skill.sh
+    if (query.trim().toLowerCase() === 'install skill.sh') {
+        setTimeout(() => {
+            const skillMsg: ChatMessage = { 
+                role: 'model', 
+                text: 'INSTALLING SKILLS... [DONE] > React / Next.js / Three.js / TypeScript / Rhino / Grasshopper / Unreal Engine', 
+                timestamp: Date.now() 
+            };
+            setMessages(prev => [...prev, skillMsg]);
+            setLoading(false);
+        }, 800);
+        return;
+    }
+
     const response = await sendMessageToSystem(query);
     setMessages(prev => [...prev, { role: 'model', text: response, timestamp: Date.now() }]);
     setLoading(false);
@@ -49,7 +70,6 @@ export const HUD: React.FC<HUDProps> = ({ scrollProgress, totalDepth }) => {
 
   const progressPercent = Math.min(100, Math.max(0, (scrollProgress / totalDepth) * 100));
   
-  // Superstudio Theme Logic
   const isWireframe = viewMode === 'wireframe';
   const textColor = isWireframe ? 'text-white' : 'text-black';
   const borderColor = isWireframe ? 'border-white' : 'border-black';
@@ -58,10 +78,13 @@ export const HUD: React.FC<HUDProps> = ({ scrollProgress, totalDepth }) => {
   return (
     <div className="fixed inset-0 z-50 pointer-events-none">
       
-      {/* 1. Header */}
-      <header className="absolute top-0 left-0 w-full p-6 flex justify-between items-start pointer-events-auto">
+      {/* 1. Header & Navigation */}
+      <header className="absolute top-0 left-0 w-full p-6 flex flex-col md:flex-row justify-between items-start md:items-center pointer-events-auto gap-4">
         <div>
-            <h1 className={`font-['Rajdhani'] text-5xl font-bold ${textColor} tracking-tight uppercase leading-none`}>
+            <h1 
+                className={`font-['Rajdhani'] text-5xl font-bold ${textColor} tracking-tight uppercase leading-none cursor-pointer`}
+                onClick={() => setAboutOpen(true)}
+            >
               Super<span className="italic font-light">Archive</span>
             </h1>
             <div className={`flex items-center gap-2 ${textColor} opacity-60 text-xs font-mono mt-1`}>
@@ -70,8 +93,28 @@ export const HUD: React.FC<HUDProps> = ({ scrollProgress, totalDepth }) => {
             </div>
         </div>
 
-        {/* View Mode Toggle */}
-        <div className="flex gap-4 items-center">
+        {/* Category Filters */}
+        {setActiveCategory && (
+            <nav className="flex flex-wrap gap-4">
+                {CATEGORIES.map(cat => (
+                    <button
+                        key={cat}
+                        onClick={() => setActiveCategory(cat)}
+                        className={`
+                            text-xs font-mono font-bold uppercase transition-all
+                            ${activeCategory === cat 
+                                ? `border-b-2 ${borderColor} opacity-100` 
+                                : `${textColor} opacity-40 hover:opacity-100`}
+                        `}
+                    >
+                        {cat}
+                    </button>
+                ))}
+            </nav>
+        )}
+
+        {/* View Mode */}
+        <div className="hidden md:flex gap-4 items-center">
             <button 
                 onClick={() => setViewMode(viewMode === 'render' ? 'wireframe' : 'render')}
                 className={`
@@ -83,15 +126,10 @@ export const HUD: React.FC<HUDProps> = ({ scrollProgress, totalDepth }) => {
             >
                 {viewMode === 'render' ? 'SWITCH TO CAD' : 'SWITCH TO RENDER'}
             </button>
-            <div className="hidden md:block">
-                <div className={`text-xs font-mono ${textColor} border-2 ${borderColor} px-2 py-1 font-bold`}>
-                    Z: {scrollProgress.toFixed(1)}
-                </div>
-            </div>
         </div>
       </header>
 
-      {/* 2. Cursor Annotation (Global Follower) */}
+      {/* 2. Cursor Annotation */}
       <AnimatePresence>
         {cursorData.visible && (
             <motion.div
@@ -119,15 +157,29 @@ export const HUD: React.FC<HUDProps> = ({ scrollProgress, totalDepth }) => {
         )}
       </AnimatePresence>
 
-      {/* 3. Coordinates (Bottom Left) */}
-      <div className={`absolute bottom-6 left-6 font-mono text-xs ${textColor} hidden sm:block opacity-60`}>
-        <div className={`border-l-2 ${borderColor} p-2 pl-3`}>
-            <div>X: {mousePos.x}</div>
-            <div>Y: {mousePos.y}</div>
-        </div>
-      </div>
+      {/* 3. About Modal (Philosophy) */}
+      <AnimatePresence>
+          {aboutOpen && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center p-8 pointer-events-auto bg-white/10 backdrop-blur-sm">
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className={`${bgColor} border-4 ${borderColor} max-w-2xl p-8 shadow-[10px_10px_0px_rgba(0,0,0,0.2)]`}
+                  >
+                      <div className="flex justify-between items-center mb-6">
+                          <h2 className={`font-['Rajdhani'] text-3xl font-bold ${textColor} uppercase`}>Manifesto</h2>
+                          <button onClick={() => setAboutOpen(false)} className={`text-xl font-bold ${textColor} hover:opacity-50`}>×</button>
+                      </div>
+                      <p className={`font-mono text-sm leading-relaxed ${textColor} text-justify`}>
+                          {MANIFESTO}
+                      </p>
+                  </motion.div>
+              </div>
+          )}
+      </AnimatePresence>
 
-      {/* 4. Scroll Bar (Right) */}
+      {/* 4. Scroll Bar */}
       <div className={`absolute right-6 top-1/2 -translate-y-1/2 h-64 w-1 ${isWireframe ? 'bg-white/20' : 'bg-black/10'}`}>
         <motion.div 
             className={`w-full ${isWireframe ? 'bg-white' : 'bg-black'}`}
@@ -136,7 +188,7 @@ export const HUD: React.FC<HUDProps> = ({ scrollProgress, totalDepth }) => {
         />
       </div>
 
-      {/* 5. AI System Core (Bottom Right) */}
+      {/* 5. Terminal */}
       <div className="absolute bottom-6 right-6 pointer-events-auto">
         <AnimatePresence>
             {chatOpen && (
